@@ -385,12 +385,30 @@ class StepDiffusion:
 
 # Ci1,factor1,fig1,ax1 = SD_constantT.runModel()
 
-# SD_dt = StepDiffusion(t_max=2e7,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
+##################
+# SD_dt0 = StepDiffusion(t_max=5e3,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
 #                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
 #                     Tc=1500,delT=-500)
 
-# Ci2,factor2,fig2,ax2 = SD_dt.runModel()
+# Ci2,factor2,fig2,ax2 = SD_dt0.runModel()
 
+# SD_dt1 = StepDiffusion(t_max=1e3,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
+#                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
+#                     Tc=1500,delT=-500)
+
+# Ci2,factor2,fig2,ax2 = SD_dt1.runModel()
+
+# SD_dt2 = StepDiffusion(t_max=5e2,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
+#                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
+#                     Tc=1500,delT=-500)
+
+# Ci2,factor2,fig2,ax2 = SD_dt2.runModel()
+
+# SD_dt3 = StepDiffusion(t_max=1e2,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
+#                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
+#                     Tc=1500,delT=-500)
+
+# Ci2,factor2,fig2,ax2 = SD_dt3.runModel()
 
 #%% CoupledModel
 
