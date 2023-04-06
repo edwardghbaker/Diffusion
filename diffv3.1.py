@@ -361,7 +361,7 @@ class StepDiffusion:
                 Ci = np.vstack((Ci,C))
         
         if plot != None:
-            fig2,ax2 = plt.subplots(figsize=(6,6))
+            fig2,ax2 = plt.subplots(figsize=(10,8))
             for i in range(Ci.shape[0]):
                 ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
@@ -380,37 +380,14 @@ class StepDiffusion:
         
         return Ci,factor
 
-# SD_constantT = StepDiffusion(t_max=3e2,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
-#                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
-#                     Tc=1500,delT=None)
-
-# Ci1,factor1,fig1,ax1 = SD_constantT.runModel()
-
-##################
-mpl.rcParams.update({'font.size': 14})
-SD_dt0 = StepDiffusion(t_max=5e3,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
-                    sphericFactor=True,C0=100,Cout=0,plot=10,legend=True,
-                    Tc=1500,delT=-500)
-
-Ci2,factor2,fig2,ax2 = SD_dt0.runModel()
-
 SD_dt1 = StepDiffusion(t_max=1e3,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
                     Tc=1500,delT=-500)
 
 Ci2,factor2,fig2,ax2 = SD_dt1.runModel()
+plt.savefig(r'C:\Users\User\OneDrive\whymanchesterwhy\HalogensInEnstatiteChondrites\Figs\Cl_1e3s.png')
 
-SD_dt2 = StepDiffusion(t_max=5e2,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
-                    sphericFactor=True,C0=100,Cout=0,plot=10,legend=True,
-                    Tc=1500,delT=-500)
 
-Ci2,factor2,fig2,ax2 = SD_dt2.runModel()
-
-SD_dt3 = StepDiffusion(t_max=1e2,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
-                    sphericFactor=True,C0=100,Cout=0,plot=10,legend=True,
-                    Tc=1500,delT=-500)
-
-Ci2,factor2,fig2,ax2 = SD_dt3.runModel()
 
 #%% CoupledModel
 
@@ -669,41 +646,18 @@ class CoupledModel:
         return Ci,factor
     
     
-CM = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
-              R_steps=15,R=500e-6,
-              C0=200,Cout=10,
-              Ti=2500,Tout=1000,
-              alpha=0.3e-6,element='Cl',
-              t_steps='Auto',t_max=1*1e2,
-              plot=10,legend=True,plotDetectionLimit=True,
-              sphericFactor=True)
+# CM = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
+#               R_steps=15,R=500e-6,
+#               C0=200,Cout=10,
+#               Ti=2500,Tout=1000,
+#               alpha=0.3e-6,element='Cl',
+#               t_steps='Auto',t_max=1*1e2,
+#               plot=10,legend=True,plotDetectionLimit=True,
+#               sphericFactor=True)
 
-CM.runModel()
+# CM.runModel()
     
 
-#%%  Look at the MELTS files 
 
 
-MELTS = pd.read_table(r"C:/Users/r11403eb/OneDrive - The University of Manchester\MELTS\windows_alphamelts_1-9\EC\Phase_mass_tbl.txt",header=2,sep=' ')
-
-#MELTS.plot(['olivine_0','spinel_0'])
-
-
-fig_crystal, [ax_crystal,ax_melt] = plt.subplots(2,1,figsize=(6,10))
-
-ax_crystal.plot(MELTS.iloc[:,4:9],MELTS['Temperature'],label=MELTS.columns[4:9])
-ax_crystal.set_xlim((-5,100))
-
-ax_melt.plot(MELTS['liquid_0'],MELTS['Temperature'],label=MELTS.columns[3])
-
-fit = np.polyfit(MELTS['Temperature'][48:],MELTS['liquid_0'][48:],deg=3)
-
-ax_melt.plot((fit[3]+fit[2]*MELTS['Temperature']+fit[1]*MELTS['Temperature']**2+fit[0]*MELTS['Temperature']**3),MELTS['Temperature'])
-ax_melt.set_xlim((-5,100))
-
-ax_crystal.legend()
-ax_melt.legend()
-
-
-
-
+# %%
