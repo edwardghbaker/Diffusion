@@ -1,0 +1,222 @@
+#png files
+*.png
+
+#jpg files
+
+*.jpg
+
+#jpeg files
+
+*.jpeg
+
+#gif files
+
+*.gif
+
+#bmp files
+
+*.bmp
+
+#psd files
+
+*.psd
+
+#tiff files
+
+*.tiff
+
+#mp3 files
+
+*.mp3
+
+#ogg files
+
+*.ogg
+
+#flac files
+
+*.flac
+
+#mp4 files
+
+*.mp4
+
+#avi files
+
+*.avi
+
+#mov files
+
+*.mov
+
+#mkv files
+
+*.mkv
+
+#flv files
+
+*.flv
+
+#mpg files
+
+*.mpg
+
+#mpeg files
+
+*.mpeg
+
+#webm files
+
+*.webm
+
+#3gp files
+
+*.3gp
+
+#3g2 files
+
+*.3g2
+
+#m4v files
+
+*.m4v
+
+#m3u8 files
+
+*.m3u8
+
+#ts files
+
+*.ts
+
+#m3u files
+
+*.m3u
+
+#asx files
+
+*.asx
+
+#asf files
+
+*.asf
+
+#wax files
+
+*.wax
+
+#wvx files
+
+*.wvx
+
+#wmx files
+
+*.wmx
+
+#wm files
+
+*.wm
+
+#wma files
+
+*.wma
+
+#ra files
+
+*.ra
+
+#ram files
+
+*.ram
+
+#pls files
+
+*.pls
+
+#mid files
+
+*.mid
+
+#midi files
+
+*.midi
+
+#kar files
+
+*.kar
+
+#rmi files
+
+*.rmi
+
+#aac files
+
+*.aac
+
+#m4a files
+
+*.m4a
+
+#m4b files
+
+*.m4b
+
+#m4p files
+
+*.m4p
+
+#m4r files
+
+*.m4r
+
+#m4u files
+
+*.m4u
+
+#3gp files
+
+*.3gp
+
+#3g2 files
+
+*.3g2
+
+#3gpp files
+
+*.3gpp
+
+#3gpp2 files
+
+*.3gpp2
+
+#3gpp-tt files
+
+*.3gpp-tt
+
+#3gpp2-tt files
+
+*.3gpp2-tt
+
+#3g2 files
+
+*.3g2
+
+#amr files
+
+*.amr
+
+#awb files
+
+*.awb
+
+#drc files
+
+*.drc
+
+#mka files
+
+*.mka
+
+#mks files
+
+*.mks
