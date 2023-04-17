@@ -386,8 +386,9 @@ SD_dt1 = StepDiffusion(t_max=1e3,t_steps='Auto',element='Cl',R_steps=25,R=500e-6
                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
                     Tc=1500,delT=-500)
 
-Ci2,factor2,fig2,ax2 = SD_dt1.runModel()
-plt.savefig(r'C:\Users\User\OneDrive\whymanchesterwhy\HalogensInEnstatiteChondrites\Figs\Cl_1e3s.png')
+# Ci2,factor2,fig2,ax2 = SD_dt1.runModel()
+
+# plt.savefig(r'figs\Cl_1e3s.png')
 
 
 
