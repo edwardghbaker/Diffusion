@@ -4,6 +4,8 @@ Created on Tue Mar  8 22:13:44 2022
 
 @author: Ed
 """
+
+#%% imports
 import numpy as np
 import pandas as pd
 import scipy.special as spec
@@ -596,6 +598,10 @@ class CoupledModel:
         return C
     
     def runModel(self):
+
+        '''
+        
+        '''
         
         X,r,Ci,factor = CoupledModel.makeInitial(self)
         CoupledModel.DTMatrix(self)
