@@ -51,8 +51,6 @@ F_comp = F_Ci[0]
 Cl_comp = Cl_Ci[0]
 Br_comp = Br_Ci[0]
 
-#%%
-
 F_comp_final = F_comp[-1,:-1]
 Cl_comp_final = Cl_comp[-1,:-1]
 Br_comp_final = Br_comp[-1,:-1]
