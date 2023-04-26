@@ -21,7 +21,10 @@ import time as time
 
 from multiprocessing import Process
 #from mpmath import mpNsum, mpPi, mpSin, mpExp, mpInf
-
+#%% standard plotting settings
+figsize = (8/2.54,6/2.54)
+figsize1by2 = (8/2.54,10/2.54)
+mpl.rcParams.update({'font.size': 8})
 #%% constants, other data and Basic Laws
 
 '''    data from Alletti, M., Baker, D. R., & Freda, C. (2007). Halogen diffusion in a basaltic melt. Geochimica et Cosmochimica Acta, 71(14), 3570–3580. https://doi.org/10.1016/j.gca.2007.04.018
@@ -32,6 +35,8 @@ dataD0 = pd.DataFrame({'D0': [5.9e-4, 3.3e-2, 7.5e-5],
                         'Ea': [218.2e3, 277.2e3, 199.1e3], 
                         'Ea_Err': [33.5e3, 8.1e3, 33.3e3]},
                       index=['F','Cl','Br'])
+
+
 
 SIMS_detectionLimit = pd.DataFrame(columns=['F[ppm]','Cl[ppm]','Br[ppm]','S[ppm]'],data=[[42,6.9,0.019,6.7]])
 
@@ -92,7 +97,7 @@ class DiffLaws:
         return C,D
     
     def makeDiffCoeffPlots():
-        fig, ax = plt.subplots(figsize=(5,5),dpi=960)
+        fig, ax = plt.subplots(figsize=figsize,dpi=960)
 
         print(DiffLaws.arrheniusD_ele('Cl',1500))
         hal = ['F','Cl','Br']
@@ -196,7 +201,7 @@ class ThermalDiff:
     def runModel(self):
         
         roots = ThermalDiff.findNRoots(self)
-        fig1,ax1 = plt.subplots(figsize=(6,8))
+        fig1,ax1 = plt.subplots(figsize=figsize)
         ax1.set_ylabel('Temperature ($^\circ$C)')
         ax1.set_xlabel('Radius ($\u03BCm$)')
 
@@ -363,7 +368,7 @@ class StepDiffusion:
                 Ci = np.vstack((Ci,C))
         
         if plot != None:
-            fig2,ax2 = plt.subplots(figsize=(10,8))
+            fig2,ax2 = plt.subplots(figsize=figsize)
             for i in range(Ci.shape[0]):
                 ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
@@ -555,7 +560,7 @@ class CoupledModel:
         DMatrix = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],TempProfiles+273.15)
         
         if plot != 0:
-            fig3,[ax3_1,ax3_2]=plt.subplots(2,1,figsize=(5,10),sharex=True)
+            fig3,[ax3_1,ax3_2]=plt.subplots(2,1,figsize=figsize1by2,sharex=True)
             fig3.tight_layout()
             for i in range(0,len(TempProfiles[:,0]),int(len(TempProfiles[:,0])/plot)):
                 ax3_1.plot(r*1e6,TempProfiles[i,:])
@@ -624,7 +629,7 @@ class CoupledModel:
                 Ci = np.vstack((Ci,C))
         
         if plot != None:
-            fig2,ax2 = plt.subplots(figsize=(6,6))
+            fig2,ax2 = plt.subplots(figsize=figsize)
             for i in range(Ci.shape[0]):
                 ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
