@@ -1,12 +1,17 @@
 #%% Import modules
 from diffv4 import CoupledModel
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 from math import pi
 
 
 #%% Create diffusion models for F,Cl,Br and I and save output to DataFrames
-
+# plotting settings
+figsize = (8/2.54,6/2.54)
+figsize1by2 = (8/2.54,10/2.54)
+mpl.rcParams.update({'font.size': 8})
+#constrained_layout=True # to be put into plt.subplots()
 #%% Create a model for F
 Fmodel = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
               R_steps=15,R=500e-6,
@@ -57,7 +62,7 @@ Br_comp_final = Br_comp[-1,:-1]
 
 #%% plot F/Cl and Br/Cl ratios
 
-ratio_fig, r_axes = plt.subplots(2,1,figsize=(4,6),sharex = True,tight_layout=True)
+ratio_fig, r_axes = plt.subplots(2,1,figsize=figsize1by2,sharex = True,constrained_layout=True)
 
 x = np.linspace(0,500,14)
 
