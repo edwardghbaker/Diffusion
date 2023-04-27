@@ -32,7 +32,7 @@ Clmodel = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
                 Ti=2000,Tout=1200+273,
                 alpha=0.3e-6,element='Cl',
                 t_steps='Auto',t_max=1*1e3,
-                plot=10,legend=True,plotDetectionLimit=True,
+                plot=10,legend=False,plotDetectionLimit=True,
                 sphericFactor=True)
 
 Cl_Ci =  Clmodel.runModel()
