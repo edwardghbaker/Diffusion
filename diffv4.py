@@ -36,6 +36,10 @@ dataD0 = pd.DataFrame({'D0': [5.9e-4, 3.3e-2, 7.5e-5],
                         'Ea_Err': [33.5e3, 8.1e3, 33.3e3]},
                       index=['F','Cl','Br'])
 
+dataD_na = pd.DataFrame({'D0': [None],
+                        'Ea': [None], 
+                        'Ea_Err': [None]},
+                      index=['Na'])
 
 
 SIMS_detectionLimit = pd.DataFrame(columns=['F[ppm]','Cl[ppm]','Br[ppm]','S[ppm]'],data=[[42,6.9,0.019,6.7]])
