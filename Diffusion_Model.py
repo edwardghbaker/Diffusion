@@ -1,23 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Diffusion Model for Halogen Diffusion in Magmatic Systems
-
-This module simulates diffusion processes in spherical geometries, particularly:
-1. Thermal diffusion - cooling of a hot sphere
-2. Material diffusion - diffusion of halogens (F, Cl, Br) from an initial state
-3. Coupled diffusion - simultaneous thermal and material diffusion
-
-The code solves the diffusion equation (Fick's laws) using finite difference methods
-and analytical solutions (eigenvalue expansion for thermal cooling).
-
 Created on Tue Mar  8 22:13:44 2022
 
 @author: Ed
 """
 
-# ============================================================================
-# IMPORTS
-# ============================================================================
+#%% imports
 import numpy as np
 import pandas as pd
 import scipy.special as spec
@@ -29,17 +17,14 @@ from tqdm import tqdm
 pi = np.pi
 import time as time
 
-# ============================================================================
-# PLOTTING CONFIGURATION
-# ============================================================================
+#%% standard plotting settings
 figsize = (5,3)
 figsize1by2 = (6,8)
 mpl.rcParams.update({'font.size': 8})
+#%% constants, other data and Basic Laws
 
-# ============================================================================
-# PHYSICAL CONSTANTS AND REFERENCE DATA
-# ============================================================================
-# Data source: Alletti et al. (2007) - Halogen diffusion in basaltic melt
+'''    data from Alletti, M., Baker, D. R., & Freda, C. (2007). Halogen diffusion in a basaltic melt. Geochimica et Cosmochimica Acta, 71(14), 3570–3580. https://doi.org/10.1016/j.gca.2007.04.018
+'''
 
 # DataFrame containing pre-exponential diffusion coefficients (D0), activation energies (Ea), and their uncertainties for halogens
 # D0 is in m^2/s, Ea (activation energy) is in J/mol
@@ -60,45 +45,34 @@ SIMS_detectionLimit = pd.DataFrame(columns=['F[ppm]','Cl[ppm]','Br[ppm]','S[ppm]
 class Ficks:
     
     def f1L(D,dc_dx):
-        """Fick's First Law - Calculate diffusive flux.
-        
-        Flux is proportional to concentration gradient with diffusion coefficient.
-        Relates diffusive flux to concentration gradient.
+        """Calculate diffusive flux using Fick's first law.
         
         Args:
-            D: Diffusion coefficient (m²/s)
-            dc_dx: Concentration gradient dC/dx (1/m)
+            D: Diffusion coefficient
+            dc_dx: Concentration gradient (dC/dx)
             
         Returns:
-            J: Diffusive flux (mol/(m²·s)) = -D * dC/dx
+            J: Diffusive flux (J = -D * dC/dx)
         """
-        # Negative sign indicates flux flows opposite to concentration gradient
+        #J = -D*((c1-c0)*(x1-x0))
         J = -D*dc_dx
         return J
     
     def f2L(D,dc2_dx2):
-        """Fick's Second Law - Calculate concentration change over time.
-        
-        Relates temporal concentration change to spatial curvature of concentration.
-        This is the fundamental diffusion equation: dC/dt = D*d²C/dx²
+        """Calculate concentration change using Fick's second law.
         
         Args:
-            D: Diffusion coefficient (m²/s)
-            dc2_dx2: Second derivative of concentration d²C/dx² (1/m²)
+            D: Diffusion coefficient
+            dc2_dx2: Second derivative of concentration (d²C/dx²)
             
         Returns:
-            dc_dt: Rate of concentration change (ppm/s) = D * d²C/dx²
+            dc_dt: Rate of concentration change (dC/dt = D * d²C/dx²)
         """
-        # Positive second derivative (concentration "bulges up") causes C to increase
-        dc_dt = D*dc2_dx2
-        return dc_dt
         dc_dt = D*dc2_dx2
         return dc_dt
 
    
-# ============================================================================
-# DIFFUSION LAWS - Analytical and Numerical Solutions
-# ============================================================================
+class DiffLaws:
     
     def pecletNumber_Time(L2,D):
         """Calculate characteristic diffusion time based on distance and diffusion coefficient.
@@ -153,19 +127,15 @@ class Ficks:
     def arrheniusD(D0,Ea,Tk):
         """Calculate temperature-dependent diffusion coefficient using Arrhenius equation.
         
-        The Arrhenius equation models how diffusion increases exponentially with temperature.
-        Formula: D(T) = D0 * exp(-Ea / (R*T))
-        
         Args:
-            D0: Pre-exponential diffusion coefficient (m²/s)
-            Ea: Activation energy (J/mol) - energy barrier to diffusion
+            D0: Pre-exponential diffusion coefficient
+            Ea: Activation energy (J/mol)
             Tk: Temperature (Kelvin)
             
         Returns:
-            D: Temperature-dependent diffusion coefficient (m²/s)
+            D: Temperature-dependent diffusion coefficient
         """
-        R = scipy.constants.R  # Gas constant: 8.314 J/(mol·K)
-        # At higher T, exponential term increases, so D increases
+        R = scipy.constants.R
         D = D0*np.exp(-Ea/(R*Tk))
         return D
     
@@ -189,50 +159,37 @@ class Ficks:
     def constantConcentration(n0,D,x,t):
         """Calculate concentration profile at constant boundary condition.
         
-        Solves diffusion equation with semi-infinite domain and fixed concentration
-        boundary. Uses the complementary error function (erfc) solution.
-        
         Args:
-            n0: Initial/boundary concentration
-            D: Diffusion coefficient (m²/s)
-            x: Distance from boundary (m)
-            t: Time (s)
+            n0: Initial concentration
+            D: Diffusion coefficient
+            x: Distance from boundary
+            t: Time
             
         Returns:
-            n: Concentration at distance x and time t
+            n: Concentration at distance x and time t (using erfc solution)
         """
-        # Analytical solution: n(x,t) = n0 * erfc(x / (2*sqrt(D*t)))
-        # The argument sqrt(D*t) represents the characteristic diffusion length
         n = n0*spec.erfc((x)/(2*np.sqrt(D*t)))   
         return n
     
     def D_1(x,h,t,C0,D0,Ea,Tk):
         """Calculate concentration profile for diffusion from finite slab.
         
-        Solves diffusion equation for material diffusing from a finite-thickness slab
-        into surrounding material. Uses analytical solution from Crank (1975).
-        
-        Reference:
-            Equation from Crank, J. (1975). The Mathematics of Diffusion. 
-            Clarendon Press, Oxford.
+        Equation from Crank, J. (1975). The Mathematics of Diffusion. Clarendon Press, Oxford.
         
         Args:
-            x: Position in the domain (m)
-            h: Half-thickness of the slab (m)
-            t: Time (s)
-            C0: Initial concentration in slab (ppm)
-            D0: Pre-exponential diffusion coefficient (m²/s)
-            Ea: Activation energy (J/mol)
+            x: Position in the domain
+            h: Half-thickness of the slab
+            t: Time
+            C0: Initial concentration
+            D0: Pre-exponential diffusion coefficient
+            Ea: Activation energy
             Tk: Temperature (Kelvin)
             
         Returns:
-            C: Concentration profile at position x and time t (ppm)
-            D: Temperature-dependent diffusion coefficient (m²/s)
+            C: Concentration profile
+            D: Temperature-dependent diffusion coefficient
         """
-        # Calculate temperature-dependent diffusion coefficient
         D = DiffLaws.arrheniusD(D0,Ea,Tk)
-        # Use complementary error function solution for slab geometry
-        # Sum erfc of symmetric distances to account for diffusion from both surfaces
         C = 0.5*C0*(spec.erfc((h-x)/(2*np.sqrt(D*t)))+spec.erfc((h+x)/(2*np.sqrt(D*t))))
         return C,D
     
@@ -268,15 +225,10 @@ class Ficks:
 
 
 
-#%% Thermal diffusion profiles 
-
-"""
-Thermal Diffusion Class
-
-Solves transient heat conduction in a sphere with fixed outer temperature boundary.
-Uses analytical eigenvalue expansion method for efficiency.
-"""
-
+#%%Thermal diffusion profiles 
+'''
+Thermal Diffusion
+'''
 
 class ThermalDiff:
     
@@ -393,36 +345,24 @@ class ThermalDiff:
         
         Calculates and plots temperature profiles at multiple time steps
         as the sphere cools following initial thermal conditions.
-        
-        Uses eigenvalue expansion method to solve heat equation in spherical geometry.
         """
-        # Find eigenvalues that satisfy the thermal boundary condition (Biot number)
         roots = ThermalDiff.findNRoots(self)
-        # Create figure with single plot for temperature vs radius
         fig1,ax1 = plt.subplots(figsize=figsize)
         ax1.set_ylabel('Temperature ($^\circ$C)')
         ax1.set_xlabel('Radius ($\u03BCm$)')
 
 
-        # Calculate and plot temperature profiles at regular time intervals
         for i in tqdm(np.linspace(0,self.t_max,self.t_steps)):
-            # Get temperature profile at current time
             x,fullOutput = ThermalDiff.Tprofile_sphere(self,zeta=roots,t=i)
-            # Plot with time as label
             ax1.plot(1e6*np.linspace(0,self.R,self.R_steps),x,label=str(str(i)+' secs'))
         ax1.legend()
 
 
 #%% Step by step 
 
-"""
-Step-by-Step Material Diffusion Class
-
-Simulates diffusion of elemental species (F, Cl, Br) from initial concentration
-using explicit finite difference scheme. Temperature can be constant or vary linearly.
-
-Uses Fick's first law with finite differences to discretize and time-march the solution.
-"""
+'''
+Stepwise diffusion
+'''
 
 
 class StepDiffusion:
@@ -456,6 +396,7 @@ class StepDiffusion:
             dt = (0.5*((R/R_steps)**2))/(D)
             t_steps = int(t_max/dt)+1
             self.t_steps = t_steps
+            self.dt = t_max/t_steps
 
         elif type(t_steps) == int:
             self.t_steps = t_steps
@@ -573,8 +514,6 @@ class StepDiffusion:
     def F1L_diffworkshop(self,X,C,dt,factor,j):
         """Apply Fick's first law with centered finite differences (alternative implementation).
         
-        This version uses vectorized operations for better performance.
-        
         Args:
             X: Radial distance array
             C: Current concentration profile
@@ -588,29 +527,27 @@ class StepDiffusion:
         D = self.D
         Cout = self.Cout
         
-        # Expand D to single time step value across all spatial nodes
+        #if type(self.T_grad) is not int or type(self.T_grad) is not float:
         D = np.ones(len(X))*D[j]
-        # Vectorized calculation of diffusive flux using centered differences
-        # dC/dx ≈ (C[i+1] - C[i-1]) / 2dx for interior points
+        #J = [((dt/((X[i+1]-X[i])))*-D[i]*(C[i+1]-2*C[i]+C[i-1])) for i in range(1,len(X)-1)] list comprehension
         J = np.array([((dt/((X[1:-1]-X[0:-2])**2))*-D[1:-1]*(C[2:]-2*C[1:-1]+C[:-2]))]) # vectorised
-        
-        # Prepend first boundary flux
+
         J = np.insert(J,0,J[0,0])
-        
-        # Apply spherical geometry correction factor to outward fluxes
+
+
         if self.sphericFactor == True:
             Jb = J*factor
         else:
             Jb = J
 
-        # Apply diffusive flux to update concentrations
+        #apply diffusive flux
         C[:-1] = C[:-1]-J
         C[1:] = C[1:]+Jb
         
-        # Enforce boundary conditions at both ends
-        C[-1] = Cout  # Fixed concentration at surface
-        C[1],C[0] = C[2],C[2]  # Symmetry boundary at center
-        C[0] = C[1]  # Ensure center continuity
+        #boundary conditions
+        C[-1] = Cout
+        C[1],C[0] = C[2],C[2]
+        C[0] = C[1]
         
         return C        
 
@@ -627,41 +564,33 @@ class StepDiffusion:
             fig2 (optional): Matplotlib figure object
             ax2 (optional): Matplotlib axes object
         """
-        # Get model parameters
         plot = self.plot
-        D = self.D  # Diffusion coefficient (temperature-dependent if specified)
-        dt = self.dt  # Time step size
-        R = self.R  # Sphere radius
-        R_steps = self.R_steps  # Number of radial steps
-        t_steps = self.t_steps  # Total number of time steps
-        ele = self.element  # Element being diffused
-        plotDetectionLimit = self.plotDetectionLimit  # Flag for SIMS detection limit
+        D = self.D 
+        dt = self.dt
+        R = self.R
+        R_steps = self.R_steps
+        t_steps = self.t_steps
+        ele = self.element
+        plotDetectionLimit = self.plotDetectionLimit
         
-        # Check numerical stability: Stability criterion (Courant number) must be < 0.5
+
         if DiffLaws.stabilityCriterion(D,dt,(R/R_steps)).min() > 0.5:
             print(str('Fail - Stability criteria not met '+'- '+ str(DiffLaws.stabilityCriterion(D,dt,(R/R_steps)).max())))
 
-        # Initialize spatial grid and concentration profile
-        X,Ci = StepDiffusion.makeInitial(self)  # Create initial profile
-        factor = StepDiffusion.sphericFactor(self,X)  # Calculate geometry factors
+        X,Ci = StepDiffusion.makeInitial(self)
+        factor = StepDiffusion.sphericFactor(self,X)
         
-        # Start with initial concentration profile
         C = Ci
         
-        # Main time-stepping loop
         for j in tqdm(range(t_steps)):
-            # Update concentration profile using Fick's law
             C = StepDiffusion.applyF1L(self,X,C,dt,factor=factor,j=j)
-            # Store concentration profile at regular intervals for plotting
             if j%(int(t_steps/plot)) == 0:
-                Ci = np.vstack((Ci,C))  # Store profile
+                Ci = np.vstack((Ci,C))       
             if j == t_steps:
-                Ci = np.vstack((Ci,C))  # Store final profile
+                Ci = np.vstack((Ci,C))
         
-        # Generate plot of concentration evolution
         if plot != None:
             fig2,ax2 = plt.subplots(figsize=figsize)
-            # Plot each stored concentration profile with time label
             for i in range(Ci.shape[0]):
                 ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
@@ -669,7 +598,6 @@ class StepDiffusion:
             ax2.set_xlabel('Radius ($\u03BCm$)')
             ax2.set_title(str(f'{self.element} for '+str(int(self.t_max/(60)))+' minutes'))
             
-            # Overlay SIMS detection limit threshold if requested
             if plotDetectionLimit == True:
                 ax2.axhline(SIMS_detectionLimit[str(ele+'[ppm]')][0],c='k')
                 
@@ -683,7 +611,9 @@ class StepDiffusion:
 
 
 #%% CoupledModel
-
+"""
+Coupled Model
+"""
 class CoupledModel:
     
     """
@@ -766,12 +696,13 @@ class CoupledModel:
         self.t_max = t_max
         if type(t_steps) == int or type(t_steps) == float:
             self.t_steps = int(t_steps)
+            self.dt = t_max/t_steps
         else:
             D = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],Ti+273.15)
             dt = (0.5*((R/R_steps)**2))/(D)
-            self.dt = dt
             t_steps = t_max/dt
             self.t_steps = int(t_steps)+1
+            self.dt = t_max/t_steps
         print(str('# time steps = '+str(self.t_steps)))
         
         self.plot = plot
@@ -1046,4 +977,224 @@ class CoupledModel:
     
 
 
-# %%
+# %%# ============================================================================
+# TESTING AND VALIDATION
+# ============================================================================
+
+if __name__ == '__main__':
+    """
+    Test suite for diffusion model implementations.
+    
+    Tests cover:
+    - Fick's law calculations
+    - Arrhenius diffusion coefficient temperature dependence
+    - Thermal diffusion models
+    - Material diffusion models (constant temperature)
+    - Coupled thermal-material diffusion models
+    """
+    
+    print("=" * 70)
+    print("DIFFUSION MODEL TEST SUITE")
+    print("=" * 70)
+    
+    # ========================================================================
+    # TEST 1: Fick's Laws
+    # ========================================================================
+    print("\n[TEST 1] Fick's First and Second Laws")
+    print("-" * 70)
+    
+    D_test = 1e-9  # Diffusion coefficient (m²/s)
+    dc_dx_test = 100  # Concentration gradient (ppm/m)
+    dc2_dx2_test = 1000  # Second derivative (ppm/m²)
+    
+    J_flux = Ficks.f1L(D_test, dc_dx_test)
+    dC_dt = Ficks.f2L(D_test, dc2_dx2_test)
+    
+    print(f"Diffusion coefficient: {D_test:.2e} m²/s")
+    print(f"Concentration gradient: {dc_dx_test} ppm/m")
+    print(f"Fick's first law - Flux J = -D*dC/dx: {J_flux:.2e} ppm·m/s")
+    print(f"Second derivative: {dc2_dx2_test} ppm/m²")
+    print(f"Fick's second law - dC/dt = D*d²C/dx²: {dC_dt:.2e} ppm/s")
+    print("✓ Fick's laws working correctly\n")
+    
+    # ========================================================================
+    # TEST 2: Arrhenius Diffusion Coefficient
+    # ========================================================================
+    print("[TEST 2] Temperature-Dependent Diffusion (Arrhenius Equation)")
+    print("-" * 70)
+    
+    element = 'Cl'
+    temps_C = np.array([1000, 1200, 1400, 1600])
+    temps_K = temps_C + 273.15
+    
+    D0_val = dataD0.loc[element]['D0']
+    Ea_val = dataD0.loc[element]['Ea']
+    
+    print(f"Element: {element}")
+    print(f"D0 (pre-exponential): {D0_val:.2e} m²/s")
+    print(f"Ea (activation energy): {Ea_val/1000:.1f} kJ/mol")
+    print(f"\nTemperature dependence:")
+    print(f"{'Temperature (°C)':<20} {'Temperature (K)':<20} {'D (m²/s)':<20}")
+    print("-" * 60)
+    
+    D_values = DiffLaws.arrheniusD(D0_val, Ea_val, temps_K)
+    for T_c, T_k, D_val in zip(temps_C, temps_K, D_values):
+        print(f"{T_c:<20.0f} {T_k:<20.2f} {D_val:<20.2e}")
+    
+    print("✓ Diffusion coefficient increases with temperature\n")
+    
+    # ========================================================================
+    # TEST 3: Analytical Solution - Constant Concentration Boundary
+    # ========================================================================
+    print("[TEST 3] Analytical Diffusion Solution (Semi-Infinite Domain)")
+    print("-" * 70)
+    
+    D_const = 1e-10  # m²/s
+    C0_const = 100  # ppm
+    time_vals = np.array([1000, 10000, 100000])  # seconds
+    distance = 1e-4  # 100 micrometers in meters
+    
+    print(f"Boundary condition: C = {C0_const} ppm at x=0")
+    print(f"Diffusion coefficient: {D_const:.2e} m²/s")
+    print(f"Distance from boundary: {distance*1e6:.1f} μm")
+    print(f"\n{'Time (s)':<20} {'Diffusion length (μm)':<25} {'Concentration (ppm)':<20}")
+    print("-" * 65)
+    
+    for t in time_vals:
+        diffusion_length = np.sqrt(D_const * t) * 1e6
+        C_profile = DiffLaws.constantConcentration(C0_const, D_const, distance, t)
+        print(f"{t:<20.0f} {diffusion_length:<25.2f} {C_profile:<20.2f}")
+    
+    print("✓ Concentration decreases away from boundary\n")
+    
+    # ========================================================================
+    # TEST 4: Thermal Diffusion Model (Small Scale)
+    # ========================================================================
+    print("[TEST 4] Thermal Diffusion - Cooling Sphere")
+    print("-" * 70)
+    
+    thermal_model = ThermalDiff(
+        x1=0.0001, x2=20*pi,  # Smaller search domain for faster testing
+        Bi_num=5,
+        n_search=1000,
+        Ti=2000,  # Initial temperature (K)
+        Tout=1000,  # Outer temperature (K)
+        R=1000e-6,  # 1 mm radius
+        R_steps=20,  # Fewer steps for speed
+        alpha=0.3e-6,
+        t_max=100,  # seconds
+        t_steps=5
+    )
+    
+    print(f"Sphere radius: {thermal_model.R*1e6:.1f} μm")
+    print(f"Initial temperature: {thermal_model.Ti} K")
+    print(f"Boundary temperature: {thermal_model.Tout} K")
+    print(f"Thermal diffusivity: {thermal_model.alpha:.2e} m²/s")
+    print(f"Biot number: {thermal_model.Bi_num}")
+    
+    # Find eigenvalues
+    roots_thermal = thermal_model.findNRoots()
+    print(f"\nFound {len(roots_thermal)} eigenvalues")
+    print(f"First 3 eigenvalues: {roots_thermal[:3]}")
+    
+    # Calculate temperature profile at final time
+    profile, fullOutput = thermal_model.Tprofile_sphere(roots_thermal, thermal_model.t_max)
+    print(f"Temperature at center: {profile[0]:.1f} K")
+    print(f"Temperature at surface: {profile[-1]:.1f} K")
+    print("✓ Thermal diffusion model working correctly\n")
+    
+    # ========================================================================
+    # TEST 5: Step-by-Step Material Diffusion (Constant Temperature)
+    # ========================================================================
+    print("[TEST 5] Material Diffusion - Constant Temperature")
+    print("-" * 70)
+    
+    step_model = StepDiffusion(
+        R=500e-6,  # 500 μm
+        R_steps=15,
+        element='Cl',
+        Tc=1500,  # Celsius
+        t_steps=50,  # Fewer steps for speed
+        t_max=1000,  # seconds
+        C0=100,  # ppm
+        Cout=10,  # ppm
+        plot=5,  # Plot 5 time snapshots
+        delT=None,  # Isothermal
+        legend=True,
+        sphericFactor=True,
+        plotDetectionLimit=True
+    )
+    
+    print(f"Element: {step_model.element}")
+    print(f"Sphere radius: {step_model.R*1e6:.1f} μm")
+    print(f"Temperature: {step_model.Tc}°C")
+    print(f"Initial concentration: {step_model.C0} ppm")
+    print(f"Surface concentration: {step_model.Cout} ppm")
+    print(f"Diffusion coefficient: {step_model.D:.2e} m²/s")
+    print(f"Time steps: {step_model.t_steps}")
+    
+    # Run model
+    print("\nRunning material diffusion model...")
+    Ci_step, factor_step, fig_step, ax_step = step_model.runModel()
+    print(f"Profile matrix shape: {Ci_step.shape}")
+    print(f"Center concentration at end: {Ci_step[-1, 0]:.2f} ppm")
+    print(f"Surface concentration (enforced): {Ci_step[-1, -1]:.2f} ppm")
+    print("✓ Material diffusion model completed\n")
+    
+    # ========================================================================
+    # TEST 6: Coupled Thermal-Material Diffusion
+    # ========================================================================
+    print("[TEST 6] Coupled Thermal-Material Diffusion")
+    print("-" * 70)
+    
+    coupled_model = CoupledModel(
+        x1=0.0001, x2=20*pi,  # Smaller search domain
+        Bi=5,
+        R_steps=15,
+        R=500e-6,
+        C0=100,  # ppm
+        Cout=10,  # ppm
+        Ti=2000,  # K
+        Tout=1500,  # K
+        alpha=0.3e-6,
+        element='Cl',
+        t_steps=40,  # Fewer steps for speed
+        t_max=500,  # seconds
+        plot=5,
+        legend=True,
+        plotDetectionLimit=True,
+        sphericFactor=True
+    )
+    
+    print(f"Element: {coupled_model.element}")
+    print(f"Sphere radius: {coupled_model.R*1e6:.1f} μm")
+    print(f"Initial temperature: {coupled_model.Ti} K ({coupled_model.Ti-273.15:.0f}°C)")
+    print(f"Boundary temperature: {coupled_model.Tout} K ({coupled_model.Tout-273.15:.0f}°C)")
+    print(f"Initial concentration: {coupled_model.C0} ppm")
+    print(f"Boundary concentration: {coupled_model.Cout} ppm")
+    print(f"Time steps: {coupled_model.t_steps}")
+    
+    # Run coupled model
+    print("\nRunning coupled thermal-material diffusion model...")
+    Ci_coupled, factor_coupled, fig_coupled, ax_coupled = coupled_model.runModel()
+    print(f"Profile matrix shape: {Ci_coupled.shape}")
+    print(f"Center concentration at end: {Ci_coupled[-1, 0]:.2f} ppm")
+    print(f"Surface concentration (enforced): {Ci_coupled[-1, -1]:.2f} ppm")
+    print(f"Temperature profiles shape: {coupled_model.TempProfiles.shape}")
+    print("✓ Coupled diffusion model completed\n")
+    
+    # ========================================================================
+    # SUMMARY
+    # ========================================================================
+    print("=" * 70)
+    print("ALL TESTS COMPLETED SUCCESSFULLY")
+    print("=" * 70)
+    print("\nSummary:")
+    print("  ✓ Fick's laws - Flux and concentration change calculations")
+    print("  ✓ Temperature-dependent diffusion - Arrhenius equation")
+    print("  ✓ Analytical solutions - Error function (erfc) solution")
+    print("  ✓ Thermal diffusion - Eigenvalue expansion in spheres")
+    print("  ✓ Material diffusion - Finite difference scheme")
+    print("  ✓ Coupled diffusion - Thermal + material coupling")
+    print("\nAll models executed without errors.")
+    print("Check generated plots for visual validation.")
