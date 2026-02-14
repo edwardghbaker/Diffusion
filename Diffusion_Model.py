@@ -1,11 +1,23 @@
 # -*- coding: utf-8 -*-
 """
+Diffusion Model for Halogen Diffusion in Magmatic Systems
+
+This module simulates diffusion processes in spherical geometries, particularly:
+1. Thermal diffusion - cooling of a hot sphere
+2. Material diffusion - diffusion of halogens (F, Cl, Br) from an initial state
+3. Coupled diffusion - simultaneous thermal and material diffusion
+
+The code solves the diffusion equation (Fick's laws) using finite difference methods
+and analytical solutions (eigenvalue expansion for thermal cooling).
+
 Created on Tue Mar  8 22:13:44 2022
 
 @author: Ed
 """
 
-#%% imports
+# ============================================================================
+# IMPORTS
+# ============================================================================
 import numpy as np
 import pandas as pd
 import scipy.special as spec
@@ -13,29 +25,24 @@ import scipy
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.optimize import bisect
-from sympy import Float
 from tqdm import tqdm
 pi = np.pi
-from line_profiler import LineProfiler
 import time as time
 
-from multiprocessing import Process
-#from mpmath import mpNsum, mpPi, mpSin, mpExp, mpInf
-#%% standard plotting settings
-figsize = (8/2.54,6/2.54)
-figsize1by2 = (8/2.54,10/2.54)
-figsize = (8,6)
-figsize1by2 = (8,10)
-
+# ============================================================================
+# PLOTTING CONFIGURATION
+# ============================================================================
 figsize = (5,3)
 figsize1by2 = (6,8)
 mpl.rcParams.update({'font.size': 8})
-#%% constants, other data and Basic Laws
 
-'''    data from Alletti, M., Baker, D. R., & Freda, C. (2007). Halogen diffusion in a basaltic melt. Geochimica et Cosmochimica Acta, 71(14), 3570–3580. https://doi.org/10.1016/j.gca.2007.04.018
-'''
+# ============================================================================
+# PHYSICAL CONSTANTS AND REFERENCE DATA
+# ============================================================================
+# Data source: Alletti et al. (2007) - Halogen diffusion in basaltic melt
 
-
+# DataFrame containing pre-exponential diffusion coefficients (D0), activation energies (Ea), and their uncertainties for halogens
+# D0 is in m^2/s, Ea (activation energy) is in J/mol
 dataD0 = pd.DataFrame({'D0': [5.9e-4, 3.3e-2, 7.5e-5],
                         'Ea': [218.2e3, 277.2e3, 199.1e3], 
                         'Ea_Err': [33.5e3, 8.1e3, 33.3e3]},
@@ -53,34 +60,45 @@ SIMS_detectionLimit = pd.DataFrame(columns=['F[ppm]','Cl[ppm]','Br[ppm]','S[ppm]
 class Ficks:
     
     def f1L(D,dc_dx):
-        """Calculate diffusive flux using Fick's first law.
+        """Fick's First Law - Calculate diffusive flux.
+        
+        Flux is proportional to concentration gradient with diffusion coefficient.
+        Relates diffusive flux to concentration gradient.
         
         Args:
-            D: Diffusion coefficient
-            dc_dx: Concentration gradient (dC/dx)
+            D: Diffusion coefficient (m²/s)
+            dc_dx: Concentration gradient dC/dx (1/m)
             
         Returns:
-            J: Diffusive flux (J = -D * dC/dx)
+            J: Diffusive flux (mol/(m²·s)) = -D * dC/dx
         """
-        #J = -D*((c1-c0)*(x1-x0))
+        # Negative sign indicates flux flows opposite to concentration gradient
         J = -D*dc_dx
         return J
     
     def f2L(D,dc2_dx2):
-        """Calculate concentration change using Fick's second law.
+        """Fick's Second Law - Calculate concentration change over time.
+        
+        Relates temporal concentration change to spatial curvature of concentration.
+        This is the fundamental diffusion equation: dC/dt = D*d²C/dx²
         
         Args:
-            D: Diffusion coefficient
-            dc2_dx2: Second derivative of concentration (d²C/dx²)
+            D: Diffusion coefficient (m²/s)
+            dc2_dx2: Second derivative of concentration d²C/dx² (1/m²)
             
         Returns:
-            dc_dt: Rate of concentration change (dC/dt = D * d²C/dx²)
+            dc_dt: Rate of concentration change (ppm/s) = D * d²C/dx²
         """
+        # Positive second derivative (concentration "bulges up") causes C to increase
+        dc_dt = D*dc2_dx2
+        return dc_dt
         dc_dt = D*dc2_dx2
         return dc_dt
 
    
-class DiffLaws:
+# ============================================================================
+# DIFFUSION LAWS - Analytical and Numerical Solutions
+# ============================================================================
     
     def pecletNumber_Time(L2,D):
         """Calculate characteristic diffusion time based on distance and diffusion coefficient.
@@ -135,15 +153,19 @@ class DiffLaws:
     def arrheniusD(D0,Ea,Tk):
         """Calculate temperature-dependent diffusion coefficient using Arrhenius equation.
         
+        The Arrhenius equation models how diffusion increases exponentially with temperature.
+        Formula: D(T) = D0 * exp(-Ea / (R*T))
+        
         Args:
-            D0: Pre-exponential diffusion coefficient
-            Ea: Activation energy (J/mol)
+            D0: Pre-exponential diffusion coefficient (m²/s)
+            Ea: Activation energy (J/mol) - energy barrier to diffusion
             Tk: Temperature (Kelvin)
             
         Returns:
-            D: Temperature-dependent diffusion coefficient
+            D: Temperature-dependent diffusion coefficient (m²/s)
         """
-        R = scipy.constants.R
+        R = scipy.constants.R  # Gas constant: 8.314 J/(mol·K)
+        # At higher T, exponential term increases, so D increases
         D = D0*np.exp(-Ea/(R*Tk))
         return D
     
@@ -167,37 +189,50 @@ class DiffLaws:
     def constantConcentration(n0,D,x,t):
         """Calculate concentration profile at constant boundary condition.
         
+        Solves diffusion equation with semi-infinite domain and fixed concentration
+        boundary. Uses the complementary error function (erfc) solution.
+        
         Args:
-            n0: Initial concentration
-            D: Diffusion coefficient
-            x: Distance from boundary
-            t: Time
+            n0: Initial/boundary concentration
+            D: Diffusion coefficient (m²/s)
+            x: Distance from boundary (m)
+            t: Time (s)
             
         Returns:
-            n: Concentration at distance x and time t (using erfc solution)
+            n: Concentration at distance x and time t
         """
+        # Analytical solution: n(x,t) = n0 * erfc(x / (2*sqrt(D*t)))
+        # The argument sqrt(D*t) represents the characteristic diffusion length
         n = n0*spec.erfc((x)/(2*np.sqrt(D*t)))   
         return n
     
     def D_1(x,h,t,C0,D0,Ea,Tk):
         """Calculate concentration profile for diffusion from finite slab.
         
-        Equation from Crank, J. (1975). The Mathematics of Diffusion. Clarendon Press, Oxford.
+        Solves diffusion equation for material diffusing from a finite-thickness slab
+        into surrounding material. Uses analytical solution from Crank (1975).
+        
+        Reference:
+            Equation from Crank, J. (1975). The Mathematics of Diffusion. 
+            Clarendon Press, Oxford.
         
         Args:
-            x: Position in the domain
-            h: Half-thickness of the slab
-            t: Time
-            C0: Initial concentration
-            D0: Pre-exponential diffusion coefficient
-            Ea: Activation energy
+            x: Position in the domain (m)
+            h: Half-thickness of the slab (m)
+            t: Time (s)
+            C0: Initial concentration in slab (ppm)
+            D0: Pre-exponential diffusion coefficient (m²/s)
+            Ea: Activation energy (J/mol)
             Tk: Temperature (Kelvin)
             
         Returns:
-            C: Concentration profile
-            D: Temperature-dependent diffusion coefficient
+            C: Concentration profile at position x and time t (ppm)
+            D: Temperature-dependent diffusion coefficient (m²/s)
         """
+        # Calculate temperature-dependent diffusion coefficient
         D = DiffLaws.arrheniusD(D0,Ea,Tk)
+        # Use complementary error function solution for slab geometry
+        # Sum erfc of symmetric distances to account for diffusion from both surfaces
         C = 0.5*C0*(spec.erfc((h-x)/(2*np.sqrt(D*t)))+spec.erfc((h+x)/(2*np.sqrt(D*t))))
         return C,D
     
@@ -233,12 +268,15 @@ class DiffLaws:
 
 
 
-#%%Thermal diffusion profiles 
-'''
-Thermal Diffusion
+#%% Thermal diffusion profiles 
 
+"""
+Thermal Diffusion Class
 
-'''
+Solves transient heat conduction in a sphere with fixed outer temperature boundary.
+Uses analytical eigenvalue expansion method for efficiency.
+"""
+
 
 class ThermalDiff:
     
@@ -295,6 +333,7 @@ class ThermalDiff:
         Returns:
             roots: Array of eigenvalues (zeta_n values)
         """
+        x = np.linspace(self.x1,self.x2*np.pi,self.n_search)
         values = ThermalDiff.Bi(x,self)
         bounds_pos = np.array([[]])
         bounds_neg = np.array([[]])
@@ -354,26 +393,36 @@ class ThermalDiff:
         
         Calculates and plots temperature profiles at multiple time steps
         as the sphere cools following initial thermal conditions.
+        
+        Uses eigenvalue expansion method to solve heat equation in spherical geometry.
         """
+        # Find eigenvalues that satisfy the thermal boundary condition (Biot number)
         roots = ThermalDiff.findNRoots(self)
+        # Create figure with single plot for temperature vs radius
         fig1,ax1 = plt.subplots(figsize=figsize)
         ax1.set_ylabel('Temperature ($^\circ$C)')
         ax1.set_xlabel('Radius ($\u03BCm$)')
 
 
+        # Calculate and plot temperature profiles at regular time intervals
         for i in tqdm(np.linspace(0,self.t_max,self.t_steps)):
+            # Get temperature profile at current time
             x,fullOutput = ThermalDiff.Tprofile_sphere(self,zeta=roots,t=i)
+            # Plot with time as label
             ax1.plot(1e6*np.linspace(0,self.R,self.R_steps),x,label=str(str(i)+' secs'))
         ax1.legend()
 
 
 #%% Step by step 
 
-'''
-Stepwise diffusion
+"""
+Step-by-Step Material Diffusion Class
 
+Simulates diffusion of elemental species (F, Cl, Br) from initial concentration
+using explicit finite difference scheme. Temperature can be constant or vary linearly.
 
-'''
+Uses Fick's first law with finite differences to discretize and time-march the solution.
+"""
 
 
 class StepDiffusion:
@@ -443,22 +492,31 @@ class StepDiffusion:
     def makeInitial(self):
         """Create initial concentration profile for diffusion simulation.
         
+        Sets uniform concentration throughout the sphere with fixed concentration
+        at the boundary (constant outer boundary condition).
+        
         Returns:
             X: Radial distance array (m)
             Ci: Initial concentration array (ppm)
         """
         R=self.R
-        C0=self.C0
-        Cout=self.Cout
+        C0=self.C0  # Initial/core concentration
+        Cout=self.Cout  # Boundary concentration
         R_steps=self.R_steps
         
+        # Create uniform radial grid
         X = np.linspace(0,R,R_steps)
+        # Initialize with uniform concentration
         Ci = np.ones(len(X))*C0
+        # Set boundary condition (at sphere surface)
         Ci[-1]=Cout
         return X,Ci
     
     def sphericFactor(self,X):
         """Calculate geometric correction factor for spherical flux geometry.
+        
+        Accounts for the change in surface area with radius in spherical coordinates.
+        The factor adjusts the flux based on the surface area at each node.
         
         Args:
             X: Radial distance array
@@ -467,9 +525,11 @@ class StepDiffusion:
             factor: Array of geometric correction factors for each radial step
         """
         factor = np.ones(len(X)-1)
+        # Calculate factor for each shell interface
         for i in range(len(X)-1):
-            r = X[i]
-            dr = X[i+1]-X[i]
+            r = X[i]  # Current radial position
+            dr = X[i+1]-X[i]  # Radial spacing
+            # Geometric factor accounts for spherical surface area change (4*pi*r^2)
             f = ((3*r**2)+(3*r*dr)+(dr**2))/((3*r**2)+(9*r*dr)+(7*dr**2))
             factor[i] = f
         
@@ -492,22 +552,28 @@ class StepDiffusion:
         D = self.D
         Cout = self.Cout
         
+        # Calculate flux at each radial interface using Fick's first law: J = -D*dC/dx
+        # Handle both time-varying D (array) and constant D (scalar)
         try: J = [-D[j]*dt*((C[i+1]-C[i])/((X[i+1]-X[i])**2)) for i in range(len(X)-1)]
         except: J = [-D*dt*((C[i+1]-C[i])/((X[i+1]-X[i])**2)) for i in range(len(X)-1)]
         
+        # Apply spherical geometry correction factor to outward fluxes
         if self.sphericFactor == True:
             Jb = J*factor
         else:
             Jb = J*factor
         
-        C[:-1] = C[:-1]-J
-        C[1:] = C[1:]+Jb 
-        C[-1] = Cout # reapply boundary condition
+        # Update concentrations: remove flux leaving node, add flux entering node
+        C[:-1] = C[:-1]-J  # Concentration decreases by outgoing flux
+        C[1:] = C[1:]+Jb   # Concentration increases by incoming flux (with geometry factor)
+        C[-1] = Cout # Enforce fixed boundary condition at surface
         
         return C
     
     def F1L_diffworkshop(self,X,C,dt,factor,j):
         """Apply Fick's first law with centered finite differences (alternative implementation).
+        
+        This version uses vectorized operations for better performance.
         
         Args:
             X: Radial distance array
@@ -522,27 +588,29 @@ class StepDiffusion:
         D = self.D
         Cout = self.Cout
         
-        #if type(self.T_grad) is not int or type(self.T_grad) is not float:
+        # Expand D to single time step value across all spatial nodes
         D = np.ones(len(X))*D[j]
-        #J = [((dt/((X[i+1]-X[i])))*-D[i]*(C[i+1]-2*C[i]+C[i-1])) for i in range(1,len(X)-1)] list comprehension
+        # Vectorized calculation of diffusive flux using centered differences
+        # dC/dx ≈ (C[i+1] - C[i-1]) / 2dx for interior points
         J = np.array([((dt/((X[1:-1]-X[0:-2])**2))*-D[1:-1]*(C[2:]-2*C[1:-1]+C[:-2]))]) # vectorised
-
+        
+        # Prepend first boundary flux
         J = np.insert(J,0,J[0,0])
-
-
+        
+        # Apply spherical geometry correction factor to outward fluxes
         if self.sphericFactor == True:
             Jb = J*factor
         else:
             Jb = J
 
-        #apply diffusive flux
+        # Apply diffusive flux to update concentrations
         C[:-1] = C[:-1]-J
         C[1:] = C[1:]+Jb
         
-        #boundary conditions
-        C[-1] = Cout
-        C[1],C[0] = C[2],C[2]
-        C[0] = C[1]
+        # Enforce boundary conditions at both ends
+        C[-1] = Cout  # Fixed concentration at surface
+        C[1],C[0] = C[2],C[2]  # Symmetry boundary at center
+        C[0] = C[1]  # Ensure center continuity
         
         return C        
 
@@ -559,33 +627,41 @@ class StepDiffusion:
             fig2 (optional): Matplotlib figure object
             ax2 (optional): Matplotlib axes object
         """
+        # Get model parameters
         plot = self.plot
-        D = self.D 
-        dt = self.dt
-        R = self.R
-        R_steps = self.R_steps
-        t_steps = self.t_steps
-        ele = self.element
-        plotDetectionLimit = self.plotDetectionLimit
+        D = self.D  # Diffusion coefficient (temperature-dependent if specified)
+        dt = self.dt  # Time step size
+        R = self.R  # Sphere radius
+        R_steps = self.R_steps  # Number of radial steps
+        t_steps = self.t_steps  # Total number of time steps
+        ele = self.element  # Element being diffused
+        plotDetectionLimit = self.plotDetectionLimit  # Flag for SIMS detection limit
         
-
+        # Check numerical stability: Stability criterion (Courant number) must be < 0.5
         if DiffLaws.stabilityCriterion(D,dt,(R/R_steps)).min() > 0.5:
             print(str('Fail - Stability criteria not met '+'- '+ str(DiffLaws.stabilityCriterion(D,dt,(R/R_steps)).max())))
 
-        X,Ci = StepDiffusion.makeInitial(self)
-        factor = StepDiffusion.sphericFactor(self,X)
+        # Initialize spatial grid and concentration profile
+        X,Ci = StepDiffusion.makeInitial(self)  # Create initial profile
+        factor = StepDiffusion.sphericFactor(self,X)  # Calculate geometry factors
         
+        # Start with initial concentration profile
         C = Ci
         
+        # Main time-stepping loop
         for j in tqdm(range(t_steps)):
+            # Update concentration profile using Fick's law
             C = StepDiffusion.applyF1L(self,X,C,dt,factor=factor,j=j)
+            # Store concentration profile at regular intervals for plotting
             if j%(int(t_steps/plot)) == 0:
-                Ci = np.vstack((Ci,C))       
+                Ci = np.vstack((Ci,C))  # Store profile
             if j == t_steps:
-                Ci = np.vstack((Ci,C))
+                Ci = np.vstack((Ci,C))  # Store final profile
         
+        # Generate plot of concentration evolution
         if plot != None:
             fig2,ax2 = plt.subplots(figsize=figsize)
+            # Plot each stored concentration profile with time label
             for i in range(Ci.shape[0]):
                 ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
@@ -593,13 +669,14 @@ class StepDiffusion:
             ax2.set_xlabel('Radius ($\u03BCm$)')
             ax2.set_title(str(f'{self.element} for '+str(int(self.t_max/(60)))+' minutes'))
             
+            # Overlay SIMS detection limit threshold if requested
             if plotDetectionLimit == True:
                 ax2.axhline(SIMS_detectionLimit[str(ele+'[ppm]')][0],c='k')
                 
             if self.legend == True:
                 ax2.legend()
             
-            fig2.savefig(str(str(self.element)+'R_steps_'+str(self.R_steps)+'t_steps_'+str(self.t_steps)+'.png'))
+            # fig2.savefig(str(str(self.element)+'R_steps_'+str(self.R_steps)+'t_steps_'+str(self.t_steps)+'.png'))
             return Ci,factor,fig2,ax2
         
         return Ci,factor
@@ -713,10 +790,11 @@ class CoupledModel:
         """
         x1 = self.x1
         x2 = self.x2
+        Bi = self.Bi
         
         f = lambda x: 1-self.Bi-x*((np.cos(x))/(np.sin(x)))
         
-        x = np.linspace(x1,x2*np.pi,self.Bi*1000)
+        x = np.linspace(x1,x2*np.pi,Bi*1000)
         values = f(x)
         bounds_pos = np.array([])
         bounds_neg = np.array([])
@@ -756,22 +834,26 @@ class CoupledModel:
         """
         R_steps = self.R_steps
         R = self.R
-        C0 = self.C0
-        Cout = self.Cout
+        C0 = self.C0  # Initial concentration
+        Cout = self.Cout  # Boundary concentration
         
-        r = np.linspace(0.000001,R,R_steps)
-        X = np.linspace(0,R,R_steps)
-        factor = np.ones(R_steps-1)
+        # Create radial grids for calculations
+        r = np.linspace(0.000001,R,R_steps)  # Near-center node slightly offset to avoid singularity
+        X = np.linspace(0,R,R_steps)  # Uniform grid
+        factor = np.ones(R_steps-1)  # Spherical geometry factors
+        # Initialize with uniform concentration
         Ci = np.ones(R_steps)*C0
-        Ci[-1]=Cout
+        Ci[-1]=Cout  # Set boundary condition
         
-        #### section to make the step diffusion factor
+        # Calculate spherical geometry correction factors for each shell interface
+        # These account for the change in surface area from r to r+dr
         for i in range(len(r)-1):
-            dr = r[i+1]-r[i]
+            dr = r[i+1]-r[i]  # Shell thickness
+            # Geometric factor corrects flux for spherical surface area (proportional to r^2)
             factor_i = ((3*r[i]**2)+(3*r[i]*dr)+(dr**2))/((3*r[i]**2)+(9*r[i]*dr)+(7*dr**2))
             factor[i] = factor_i
-        ####
         
+        # Store for later use
         self.X = X
         self.r = r
         self.Ci = Ci
@@ -817,30 +899,37 @@ class CoupledModel:
         element = self.element
         t_steps = self.t_steps
         t_max = self.t_max
-        Ti = self.Ti
-        Tout = self.Tout
+        Ti = self.Ti  # Initial temperature
+        Tout = self.Tout  # Outer boundary temperature
         plot = self.plot
         
-        zeta = CoupledModel.findNRoots(self)
-        X,r,Ci,factor = CoupledModel.makeInitial(self)
+        # Solve thermal problem: find eigenvalues and calculate temperature profiles
+        zeta = CoupledModel.findNRoots(self)  # Eigenvalues for thermal diffusion
+        X,r,Ci,factor = CoupledModel.makeInitial(self)  # Initialize spatial grid
+        # Create matrix to store temperature at each time step and radial position
         TempProfiles = np.ones((t_steps,len(r)))
         
+        # Calculate temperature profile at each time step
         for i,t in enumerate(tqdm(np.linspace(0,t_max,t_steps))):
             profile = CoupledModel.Tprofile_sphere(self,zeta=zeta, t=t, r=r, Ti=Ti, Tout=Tout)
             TempProfiles[i,:] = profile
             
-        #To get rid of the gaussian problems with t=0, i will just impliment the starting conditions
+        # Fix initial condition (t=0) with starting values to avoid numerical artifacts
         TempProfiles[0,:] = Ti
         TempProfiles[0,-1] = Tout
         
+        # Calculate temperature-dependent diffusion coefficients using Arrhenius equation
+        # D = D0 * exp(-Ea/(R*T))
         DMatrix = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],TempProfiles+273.15)
         
+        # Plot temperature and diffusion coefficient profiles at selected time steps
         if plot != 0:
             fig3,[ax3_1,ax3_2]=plt.subplots(2,1,figsize=figsize1by2,sharex=True)
             fig3.tight_layout()
+            # Evenly spaced time steps for plotting
             for i in range(0,len(TempProfiles[:,0]),int(len(TempProfiles[:,0])/plot)):
-                ax3_1.plot(r*1e6,TempProfiles[i,:])
-                ax3_2.plot(r*1e6,DMatrix[i,:])
+                ax3_1.plot(r*1e6,TempProfiles[i,:])  # Plot in micrometers
+                ax3_2.plot(r*1e6,DMatrix[i,:])  # Diffusion coefficient varies with temperature
             
             ax3_1.set_ylabel('Temperature ($^\circ$C)')
             ax3_2.set_ylabel('Diffusivity $M^2s^{-1}$')
@@ -864,22 +953,25 @@ class CoupledModel:
         Returns:
             C: Updated concentration profile
         """
-        dt = self.dt
-        factor = self.factor
+        dt = self.dt  # Time step size
+        factor = self.factor  # Spherical geometry factors
+        Cout = self.Cout  # Boundary concentration
 
-        Cout = self.Cout
-
+        # Calculate diffusive flux at each interface: J = -D*dC/dx
+        # Try to use time-varying D[j,i], fall back to constant D if needed
         try: J = [-D[j,i]*dt*((C[i+1]-C[i])/((X[i+1]-X[i])**2)) for i in range(len(X)-1)]
         except: J = [-D*dt*((C[i+1]-C[i])/((X[i+1]-X[i])**2)) for i in range(len(X)-1)]
 
+        # Apply spherical geometry corrections to outward fluxes
         if self.sphericFactor == True:
-            Jb = J*factor
+            Jb = J*factor  # Scale by surface area factor
         else:
             Jb = J*factor
         
-        C[:-1] = C[:-1]-J
-        C[1:] = C[1:]+Jb 
-        C[-1] = Cout # reapply boundary condition
+        # Update concentrations using finite difference method
+        C[:-1] = C[:-1]-J  # Decrease concentration by outgoing flux
+        C[1:] = C[1:]+Jb   # Increase concentration by incoming flux
+        C[-1] = Cout # Enforce boundary condition at surface
         
         return C
     
@@ -896,36 +988,42 @@ class CoupledModel:
             fig2 (optional): Matplotlib figure object if plot != None
             ax2 (optional): Matplotlib axes object if plot != None
         """
+        # Initialize spatial grid and calculate thermal/diffusion matrices
         X,r,Ci,factor = CoupledModel.makeInitial(self)
-        CoupledModel.DTMatrix(self)
+        CoupledModel.DTMatrix(self)  # Solve coupling: thermal problem then diffusion
         
+        # Get simulation parameters
         plot = self.plot
         dt = self.t_max/self.t_steps
         R = self.R
         R_steps = self.R_steps
         t_steps = self.t_steps
-        DMatrix = self.DMatrix
+        DMatrix = self.DMatrix  # Temperature-dependent diffusion coefficients
         
         ele = self.element
         plotDetectionLimit = self.plotDetectionLimit
-        Dmax = np.max(DMatrix)
+        Dmax = np.max(DMatrix)  # Maximum diffusion coefficient for stability check
 
-        
+        # Check numerical stability: Courant number must be < 0.5 for stability
         if DiffLaws.stabilityCriterion(Dmax,dt,(R/R_steps)).min() > 0.5:
             print(str('Fail - Stability criteria not met '+'- '+ str(DiffLaws.stabilityCriterion(Dmax,dt,(R/R_steps)).max())))
         
-        C = Ci
+        C = Ci.copy()  # Current concentration profile (start with initial profile)
 
+        # Time stepping loop - calculate concentration evolution
         for j in range(t_steps):
-            
+            # Update concentration using Fick's law with temperature-dependent D
             C = CoupledModel.f1L(self,X,C,D=DMatrix,j=j)
+            # Store profile at regular intervals for plotting
             if j%(int(t_steps/plot)) == 0:
                 Ci = np.vstack((Ci,C))       
             if j == t_steps:
                 Ci = np.vstack((Ci,C))
         
+        # Generate plot of concentration profiles
         if plot != None:
             fig2,ax2 = plt.subplots(figsize=figsize)
+            # Plot each stored concentration profile
             for i in range(Ci.shape[0]):
                 ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
@@ -933,13 +1031,14 @@ class CoupledModel:
             ax2.set_xlabel('Radius ($\u03BCm$)')
             ax2.set_title(str(f'{self.element} for '+str(int(self.t_max/(60)))+' minutes'))
             
+            # Overlay SIMS detection limit if requested
             if plotDetectionLimit == True:
                 ax2.axhline(SIMS_detectionLimit[str(ele+'[ppm]')][0],c='k')
                 
             if self.legend == True:
                 ax2.legend()
             
-            fig2.savefig(str(str(self.element)+'R_steps_'+str(self.R_steps)+'t_steps_'+str(self.t_steps)+'.png'))
+            # fig2.savefig(str(str(self.element)+'R_steps_'+str(self.R_steps)+'t_steps_'+str(self.t_steps)+'.png'))
             return Ci,factor,fig2,ax2
         
         return Ci,factor

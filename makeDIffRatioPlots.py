@@ -1,5 +1,5 @@
 # %% Import modules
-from diffv4 import CoupledModel
+from Diffusion_Model import CoupledModel
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
@@ -13,11 +13,16 @@ figsize1by2 = (8/2.54,10/2.54)
 mpl.rcParams.update({'font.size': 8})
 #constrained_layout=True # to be put into plt.subplots()
 
+T_initial = 2000
+T_external = 1200+273
+C_initial = 200
+C_out = 10
+
 # %% Create a model for F
 Fmodel = CoupledModel(x1=0.0001,x2=500*pi,
                         R_steps=15,R=500e-6,
-                        C0=5000,Cout=10,
-                        Ti=1200+273,Tout=1200+273,
+                        C0=C_initial,Cout=C_out,
+                        Ti=T_initial,Tout=T_external,
                         alpha=0.3e-6,element='F',
                         t_steps='Auto',t_max=1e3,
                         plot=10,legend=True,plotDetectionLimit=True,
@@ -29,8 +34,8 @@ F_Ci =  Fmodel.runModel()
 
 Clmodel = CoupledModel(x1=0.0001,x2=500*pi,
                         R_steps=15,R=500e-6,
-                        C0=5000,Cout=10,
-                        Ti=1200+273,Tout=1200+273,
+                        C0=C_initial,Cout=C_out,
+                        Ti=T_initial,Tout=T_external,
                         alpha=0.3e-6,element='Cl',
                         t_steps='Auto',t_max=1e3,
                         plot=10,legend=False,plotDetectionLimit=True,
@@ -42,8 +47,8 @@ Cl_Ci =  Clmodel.runModel()
 
 Brmodel = CoupledModel(x1=0.0001,x2=500*pi,
                         R_steps=15,R=500e-6,
-                        C0=5000,Cout=10,
-                        Ti=1200+273,Tout=1200+273,
+                        C0=C_initial,Cout=C_out,
+                        Ti=T_initial,Tout=T_external,
                         alpha=0.3e-6,element='Br',
                         t_steps='Auto',t_max=1*1e3,
                         plot=10,legend=True,plotDetectionLimit=True,
