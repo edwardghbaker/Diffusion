@@ -14,40 +14,40 @@ mpl.rcParams.update({'font.size': 8})
 #constrained_layout=True # to be put into plt.subplots()
 
 # %% Create a model for F
-Fmodel = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
-              R_steps=15,R=500e-6,
-              C0=200,Cout=10,
-              Ti=1500+273,Tout=900+273,
-              alpha=0.3e-6,element='F',
-              t_steps='Auto',t_max=1*1e3,
-              plot=10,legend=True,plotDetectionLimit=True,
-              sphericFactor=True)
+Fmodel = CoupledModel(x1=0.0001,x2=500*pi,
+                        R_steps=15,R=500e-6,
+                        C0=5000,Cout=10,
+                        Ti=1200+273,Tout=1200+273,
+                        alpha=0.3e-6,element='F',
+                        t_steps='Auto',t_max=1e3,
+                        plot=10,legend=True,plotDetectionLimit=True,
+                        sphericFactor=True)
 
 F_Ci =  Fmodel.runModel()
 
 # %% Create a model for Cl
 
-Clmodel = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
-                R_steps=15,R=500e-6,
-                C0=5000,Cout=10,
-                Ti=1500+273,Tout=900+273,
-                alpha=0.3e-6,element='Cl',
-                t_steps='Auto',t_max=1*1e3,
-                plot=10,legend=False,plotDetectionLimit=True,
-                sphericFactor=True)
+Clmodel = CoupledModel(x1=0.0001,x2=500*pi,
+                        R_steps=15,R=500e-6,
+                        C0=5000,Cout=10,
+                        Ti=1200+273,Tout=1200+273,
+                        alpha=0.3e-6,element='Cl',
+                        t_steps='Auto',t_max=1e3,
+                        plot=10,legend=False,plotDetectionLimit=True,
+                        sphericFactor=True)
 
 Cl_Ci =  Clmodel.runModel()
 
 # %% Create a model for Br
 
-Brmodel = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
-                R_steps=15,R=500e-6,
-                C0=50,Cout=10,
-                Ti=1500+273,Tout=900+273,
-                alpha=0.3e-6,element='Br',
-                t_steps='Auto',t_max=1*1e3,
-                plot=10,legend=True,plotDetectionLimit=True,
-                sphericFactor=True)
+Brmodel = CoupledModel(x1=0.0001,x2=500*pi,
+                        R_steps=15,R=500e-6,
+                        C0=5000,Cout=10,
+                        Ti=1200+273,Tout=1200+273,
+                        alpha=0.3e-6,element='Br',
+                        t_steps='Auto',t_max=1*1e3,
+                        plot=10,legend=True,plotDetectionLimit=True,
+                        sphericFactor=True)
 
 Br_Ci =  Brmodel.runModel()
 

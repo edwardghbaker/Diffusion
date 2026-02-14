@@ -24,6 +24,11 @@ from multiprocessing import Process
 #%% standard plotting settings
 figsize = (8/2.54,6/2.54)
 figsize1by2 = (8/2.54,10/2.54)
+figsize = (8,6)
+figsize1by2 = (8,10)
+
+figsize = (5,3)
+figsize1by2 = (6,8)
 mpl.rcParams.update({'font.size': 8})
 #%% constants, other data and Basic Laws
 
@@ -709,9 +714,9 @@ class CoupledModel:
         x1 = self.x1
         x2 = self.x2
         
-        f = lambda x: 1-Bi-x*((np.cos(x))/(np.sin(x)))
+        f = lambda x: 1-self.Bi-x*((np.cos(x))/(np.sin(x)))
         
-        x = np.linspace(x1,x2*np.pi,Bi*1000)
+        x = np.linspace(x1,x2*np.pi,self.Bi*1000)
         values = f(x)
         bounds_pos = np.array([])
         bounds_neg = np.array([])
