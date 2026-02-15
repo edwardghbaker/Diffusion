@@ -420,13 +420,9 @@ class StepDiffusion:
         
         if delT == None:
             self.D = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],Tc+273.15)
-            print(self.D)
-            print(np.shape(self.D))
         elif type(delT) is int or type(delT) is float:
             Ts = np.linspace(Tc,Tc+delT,t_steps)
             self.D = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],Ts+273.15)
-            print(self.D)
-            print(np.shape(self.D))
         else:
             print('delT entered in wrong format, must be "None", int or float')
     

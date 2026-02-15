@@ -96,7 +96,7 @@ if __name__ == '__main__':
                             plotDetectionLimit=False  # Don't show SIMS detection limit
                             )
 
-    F_Ci = F_model.runModel()
+    F_Ci = F_model.runModel()[0]  # Get concentration matrix (time_steps x radial_positions)
 
     # CHLORINE DIFFUSION MODEL
     # Chlorine is the middle diffuser - much slower than F
@@ -117,7 +117,7 @@ if __name__ == '__main__':
                             plotDetectionLimit=False  # Don't show SIMS detection limit
                             )
 
-    Cl_Ci = Cl_model.runModel()
+    Cl_Ci = Cl_model.runModel()[0]  # Get concentration matrix (time_steps x radial_positions)
 
     # BROMINE DIFFUSION MODEL
     # Bromine is the slowest diffuser and least soluble
@@ -138,7 +138,7 @@ if __name__ == '__main__':
                             plotDetectionLimit=False  # Don't show SIMS detection limit
                             )
 
-    Br_Ci = Br_model.runModel()
+    Br_Ci = Br_model.runModel()[0]  # Get concentration matrix (time_steps x radial_positions)
 
     print("✓ All diffusion models completed")
     print()
@@ -151,15 +151,11 @@ if __name__ == '__main__':
 
     # Get the concentration matrix from each model
     # F_Ci, Cl_Ci, Br_Ci are 2D arrays: [time_steps, radial_positions]
-    F_comp = F_Ci[0]          # Full F concentration matrix
-    Cl_comp = Cl_Ci[0]        # Full Cl concentration matrix
-    Br_comp = Br_Ci[0]        # Full Br concentration matrix
-
     # Extract final concentration profile (last time step, all radii)
     # [:-1] removes the boundary condition point (kept constant at C_out)
-    F_comp_final = F_comp[-1,:-1]   # F profile at end of cooling
-    Cl_comp_final = Cl_comp[-1,:-1] # Cl profile at end of cooling
-    Br_comp_final = Br_comp[-1,:-1] # Br profile at end of cooling
+    F_comp_final = F_Ci[-1,:-1]   # F profile at end of cooling
+    Cl_comp_final = Cl_Ci[-1,:-1] # Cl profile at end of cooling
+    Br_comp_final = Br_Ci[-1,:-1] # Br profile at end of cooling
 
     # ============================================================================
     # ANALYSIS: ELEMENTAL RATIOS AND FRACTIONATION
@@ -172,7 +168,7 @@ if __name__ == '__main__':
     # ============================================================================
     # Two-panel figure showing:
     # Top: Concentration profiles vs radius for F, Cl, Br after cooling
-    # Bottom: F/Cl and Br/Cl ratios showing halogen fractionation
+    # Bottom: F/Cl and Br/Cl ratios showing halogen relative fractionation
 
     ratio_fig, r_axes = plt.subplots(2,1,figsize=figsize1by2,constrained_layout=True)
 
@@ -190,9 +186,6 @@ if __name__ == '__main__':
     r_axes[0].legend()
 
     # BOTTOM PANEL: Elemental ratios (F/Cl and Br/Cl)
-    # These ratios show how much each halogen has been preferentially lost
-    # F/Cl decreases faster (F diffuses faster) → core becomes Cl-rich and F-poor
-    # Br/Cl increases (Br diffuses slower) → core becomes Br-rich and Cl-poor
     r_axes[1].plot(F_comp_final/Cl_comp_final,label='F/Cl')
     r_axes[1].plot(Br_comp_final/Cl_comp_final,label='Br/Cl',color='C2')
     r_axes[1].set_ylabel('Ratio')
@@ -206,7 +199,6 @@ if __name__ == '__main__':
     # Normalize ratios relative to their initial values
     # This shows how much fractionation has occurred from the original composition
     # Values < 1: element has been preferentially lost (diffused out)
-    # Values > 1: element has been preferentially retained (diffused in slower)
 
     x = np.linspace(0,chondrule_radius*1e6,100)
     fig,ax=plt.subplots(figsize=figsize)
@@ -220,7 +212,7 @@ if __name__ == '__main__':
     ax.set_xlabel(f'Distance from Centre ($\u03BCm$)')
     ax.set_yscale('log')
     #ax.set_ylim(0.5,50)
-    ax.axhline(y=1,linestyle='--',color='k')  # Ratio = 1 means no fractionation
+    ax.axhline(y=1,linestyle='--',color='k')  # Ratio = 1 means no relative fractionation
     ax.legend()
 
     print("✓ Fractionation plots generated")
