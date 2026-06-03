@@ -4,21 +4,20 @@ Created on Tue Mar  8 22:13:44 2022
 
 @author: Ed
 """
-
-# %%
+#%%
 import numpy as np
 import pandas as pd
 import scipy.special as spec
 import scipy
 import matplotlib.pyplot as plt
 from scipy.optimize import bisect
-from sympy import Float
+# from sympy import Float
 from tqdm import tqdm
 pi = np.pi
-from line_profiler import LineProfiler
+# from line_profiler import LineProfiler
 import time as time
 
-from multiprocessing import Process
+# from multiprocessing import Process
 #from mpmath import mpNsum, mpPi, mpSin, mpExp, mpInf
 
 #%% constants, other data and Basic Laws
@@ -32,8 +31,7 @@ dataD0 = pd.DataFrame({'D0': [5.9e-4, 3.3e-2, 7.5e-5],
                         'Ea_Err': [33.5e3, 8.1e3, 33.3e3]},
                       index=['F','Cl','Br'])
 
-SIMS_detectionLimit = pd.DataFrame(columns=['F[ppm]','Cl[ppm]','Br[ppm]','S[ppm]'],
-                                   data=[[4.9,2.2,0.6,np.nan]])
+SIMS_detectionLimit = pd.DataFrame(columns=['F[ppm]','Cl[ppm]','Br[ppm]','S[ppm]'],data=[[42,6.9,0.019,6.7]])
 
 
 class Ficks:
@@ -90,29 +88,6 @@ class DiffLaws:
         D = DiffLaws.arrheniusD(D0,Ea,Tk)
         C = 0.5*C0*(spec.erfc((h-x)/(2*np.sqrt(D*t)))+spec.erfc((h+x)/(2*np.sqrt(D*t))))
         return C,D
-    
-    def Balluffi_thinFilm(L=150e-6,C0=1,time=[1e1],Tk=1500,steps=100,element='Br',Plot=True):
-        fig, ax = plt.subplots(1,1,figsize=(8,6))
-        D = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],Tk)    
-
-        for t in time:
-            C = []
-            for x in np.linspace(0,L,steps):
-                c = Float(((4*C0)/(pi))*(mpNsum(lambda j: ((1/(2*j+1))*
-                                                   (mpSin((2*j+1)*mpPi*x/L))*
-                                                   (mpExp((D*t*mpPi**2)*(-(2*j+1)**2)/(L**2)))),
-                                        [0, mpInf])))
-                C.append(c)
-                
-            if Plot == True:
-                #note x data multiplied by 1e6 to convert to microns
-                ax.plot(np.linspace(L/2,L,steps//2)*1e6,C[len(C)//2:],label=str(str(t)+' sec'))
-                ax.set_ylabel('Concentration')
-                ax.set_xlabel('Distance (\u03BCm)')
-                ax.legend()
-            else: next
-        return C,ax
-    
     
     def makeDiffCoeffPlots():
         fig, ax = plt.subplots(figsize=(5,5),dpi=960)
@@ -226,12 +201,8 @@ class ThermalDiff:
 
         for i in tqdm(np.linspace(0,self.t_max,self.t_steps)):
             x,fullOutput = ThermalDiff.Tprofile_sphere(self,zeta=roots,t=i)
-            ax1.plot(1e6*np.linspace(0,self.R,self.R_steps),x,label=str(str(i)+' s'))
+            ax1.plot(1e6*np.linspace(0,self.R,self.R_steps),x,label=str(str(i)+' secs'))
         ax1.legend()
-
-# TD = ThermalDiff()
-
-# TD.runModel()
 
 
 #%% Step by step 
@@ -264,7 +235,6 @@ class StepDiffusion:
             
         else:
             print('t_steps entered in wrong format, must be "Auto" or int')
-
             
         self.dt = t_max/t_steps
         
@@ -325,7 +295,7 @@ class StepDiffusion:
         if self.sphericFactor == True:
             Jb = J*factor
         else:
-            Jb = J
+            Jb = J*factor
         
         C[:-1] = C[:-1]-J
         C[1:] = C[1:]+Jb 
@@ -375,7 +345,6 @@ class StepDiffusion:
         plotDetectionLimit = self.plotDetectionLimit
         
 
-        
         if DiffLaws.stabilityCriterion(D,dt,(R/R_steps)).min() > 0.5:
             print(str('Fail - Stability criteria not met '+'- '+ str(DiffLaws.stabilityCriterion(D,dt,(R/R_steps)).max())))
 
@@ -383,22 +352,18 @@ class StepDiffusion:
         factor = StepDiffusion.sphericFactor(self,X)
         
         C = Ci
-        j_plot = []
         
         for j in tqdm(range(t_steps)):
             C = StepDiffusion.applyF1L(self,X,C,dt,factor=factor,j=j)
             if j%(int(t_steps/plot)) == 0:
-                Ci = np.vstack((Ci,C))   
-                j_plot.append(j) 
-            # if j == t_steps-1:
-            #     Ci = np.vstack((Ci,C))
-            #     j_plot.append(j)
+                Ci = np.vstack((Ci,C))       
+            if j == t_steps:
+                Ci = np.vstack((Ci,C))
         
         if plot != None:
-            fig2,ax2 = plt.subplots(figsize=(5,4))
-            for i in range(1,Ci.shape[0]):
-                print(i)
-                ax2.plot(1e6*X,Ci[i,:],label=f'{round(j_plot[i-1]*dt)}s')
+            fig2,ax2 = plt.subplots(figsize=(6,6))
+            for i in range(Ci.shape[0]):
+                ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
             ax2.set_ylabel('Concentraiton ($\u03BCg.g^{-1}$)')
             ax2.set_xlabel('Radius ($\u03BCm$)')
@@ -408,15 +373,15 @@ class StepDiffusion:
                 ax2.axhline(SIMS_detectionLimit[str(ele+'[ppm]')][0],c='k')
                 
             if self.legend == True:
-                ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                ax2.legend()
             
             fig2.savefig(str(str(self.element)+'R_steps_'+str(self.R_steps)+'t_steps_'+str(self.t_steps)+'.png'))
-            return Ci,factor,fig2,ax2,j_plot
+            return Ci,factor,fig2,ax2
         
         return Ci,factor
 
-# SD_constantT = StepDiffusion(t_max=3e2,t_steps='Auto',element='F',R_steps=25,R=500e-6,
-#                     sphericFactor=True,C0=100,Cout=10,plot=10,legend=False,
+# SD_constantT = StepDiffusion(t_max=3e2,t_steps='Auto',element='Cl',R_steps=25,R=500e-6,
+#                     sphericFactor=True,C0=100,Cout=0,plot=10,legend=False,
 #                     Tc=1500,delT=None)
 
 # Ci1,factor1,fig1,ax1 = SD_constantT.runModel()
@@ -452,27 +417,23 @@ class CoupledModel:
     
     I've tried but because one step is dependent on the output of the second step each must be done in order. If you want to run several simulations at once it is possible to simply impliment multi core processing for that. It may be easier to simply run overnight.
 
-    
-    ***TO DO***
-    1. Add in output parameter for proportion of substance lost
-    2. Check and see if the model can accept a variable external temperature
-    3. Check why the R_steps changes the output
-    
+  
     """ 
     
     dataD0 = pd.DataFrame({'D0': [5.9e-4, 3.3e-2, 7.5e-5], 
                            'Ea': [218.2e3, 277.2e3, 199.1e3], 
                            'Ea_Err': [33.5e3, 8.1e3, 33.3e3]},
                           index=['F','Cl','Br'])
-    
-    
+       
+        
     def __init__(self,x1=0.0001,x2=500*pi,Bi=1,
-                 R_steps=25,R=2500e-6,
+                 R_steps=25,R=500e-6,
                  C0=200,Cout=10,
+                 Ti=2500,Tout=1500,
                  alpha=0.3e-6,element='F',
                  t_steps='Auto',t_max=1*1e4,
-                 plot=10,
-                 Ti=2500,Tout=1500):
+                 plot=10,legend=True,plotDetectionLimit=True,
+                 sphericFactor=True):
         
         self.x1 = x1
         self.x2 = x2
@@ -484,6 +445,9 @@ class CoupledModel:
         self.C0 = C0
         self.Cout = Cout
         
+        self.Ti = Ti
+        self.Tout = Tout
+                
         self.alpha = alpha
         self.element = element
         
@@ -493,15 +457,15 @@ class CoupledModel:
         else:
             D = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],Ti+273.15)
             dt = (0.5*((R/R_steps)**2))/(D)
+            self.dt = dt
             t_steps = t_max/dt
             self.t_steps = int(t_steps)+1
         print(str('# time steps = '+str(self.t_steps)))
         
         self.plot = plot
-        
-        self.Ti = Ti
-        self.Tout = Tout
-        
+        self.legend = legend
+        self.plotDetectionLimit = plotDetectionLimit
+        self.sphericFactor = sphericFactor
         
     def findNRoots(self):
         
@@ -545,16 +509,24 @@ class CoupledModel:
         Cout = self.Cout
         
         r = np.linspace(0.000001,R,R_steps)
+        X = np.linspace(0,R,R_steps)
         factor = np.ones(R_steps-1)
         Ci = np.ones(R_steps)*C0
         Ci[-1]=Cout
+        
         #### section to make the step diffusion factor
         for i in range(len(r)-1):
             dr = r[i+1]-r[i]
             factor_i = ((3*r[i]**2)+(3*r[i]*dr)+(dr**2))/((3*r[i]**2)+(9*r[i]*dr)+(7*dr**2))
             factor[i] = factor_i
         ####
-        return r,Ci,factor
+        
+        self.X = X
+        self.r = r
+        self.Ci = Ci
+        self.factor = factor
+        
+        return X,r,Ci,factor
     
     def Tprofile_sphere(self,zeta,t,r,Ti,Tout):
         
@@ -567,6 +539,7 @@ class CoupledModel:
         output = np.sum(output,axis=0)
         profile = Tout + (Ti-Tout)*output
         
+        #print(np.shape(profile))
         return profile
     
     def DTMatrix(self):
@@ -578,16 +551,17 @@ class CoupledModel:
         plot = self.plot
         
         zeta = CoupledModel.findNRoots(self)
-        r,Ci,factor = CoupledModel.makeInitial(self)
+        X,r,Ci,factor = CoupledModel.makeInitial(self)
         TempProfiles = np.ones((t_steps,len(r)))
         
         for i,t in enumerate(tqdm(np.linspace(0,t_max,t_steps))):
             profile = CoupledModel.Tprofile_sphere(self,zeta=zeta, t=t, r=r, Ti=Ti, Tout=Tout)
             TempProfiles[i,:] = profile
+            
         #To get rid of the gaussian problems with t=0, i will just impliment the starting conditions
-        
         TempProfiles[0,:] = Ti
         TempProfiles[0,-1] = Tout
+        
         DMatrix = DiffLaws.arrheniusD(dataD0.loc[element]['D0'],dataD0.loc[element]['Ea'],TempProfiles+273.15)
         
         if plot != 0:
@@ -601,16 +575,19 @@ class CoupledModel:
             ax3_2.set_ylabel('Diffusivity $M^2s^{-1}$')
             ax3_2.set_xlabel('Radius ($\u03BCm$)')
         else: next
-                    
-        return TempProfiles,DMatrix,r,Ci,factor,t_steps,t_max
+        self.TempProfiles = TempProfiles
+        self.DMatrix = DMatrix
     
-    def f1L(self,X,C,dt,factor,j):    
-        D = self.D
+    def f1L(self,X,C,D,j):    
+        
+        dt = self.dt
+        factor = self.factor
+
         Cout = self.Cout
-        
-        try: J = [-D[j]*dt*((C[i+1]-C[i])/((X[i+1]-X[i])**2)) for i in range(len(X)-1)]
+
+        try: J = [-D[j,i]*dt*((C[i+1]-C[i])/((X[i+1]-X[i])**2)) for i in range(len(X)-1)]
         except: J = [-D*dt*((C[i+1]-C[i])/((X[i+1]-X[i])**2)) for i in range(len(X)-1)]
-        
+
         if self.sphericFactor == True:
             Jb = J*factor
         else:
@@ -623,53 +600,93 @@ class CoupledModel:
         return C
     
     def runModel(self):
-        plot = self.plot   
-        TempProfiles,DMatrix,r,Ci,factor,t_steps,t_max = CoupledModel.DTMatrix(self)
+        
+        X,r,Ci,factor = CoupledModel.makeInitial(self)
+        CoupledModel.DTMatrix(self)
+        
+        plot = self.plot
+        dt = self.t_max/self.t_steps
+        R = self.R
+        R_steps = self.R_steps
+        t_steps = self.t_steps
+        DMatrix = self.DMatrix
+        
+        ele = self.element
+        plotDetectionLimit = self.plotDetectionLimit
+        Dmax = np.max(DMatrix)
+
+        
+        if DiffLaws.stabilityCriterion(Dmax,dt,(R/R_steps)).min() > 0.5:
+            print(str('Fail - Stability criteria not met '+'- '+ str(DiffLaws.stabilityCriterion(Dmax,dt,(R/R_steps)).max())))
+        
         C = Ci
-        dt = t_max/t_steps
-        
-        if DiffLaws.stabilityCriterion(
-                DiffLaws.arrheniusD(dataD0.loc[self.element]['D0'],dataD0.loc[self.element]['Ea'],self.Ti+273.15),
-                self.t_max/self.t_steps,
-                (self.R/self.R_steps)) > 0.5:
+
+        for j in range(t_steps):
             
-            print(str('Fail - Stability criteria not met  -  ' + str(DiffLaws.stabilityCriterion(
-                    DiffLaws.arrheniusD(dataD0.loc[self.element]['D0'],dataD0.loc[self.element]['Ea'],self.Ti+273.15),
-                    self.t_max/self.t_steps,
-                    (self.R/self.R_steps)))))
+            C = CoupledModel.f1L(self,X,C,D=DMatrix,j=j)
+            if j%(int(t_steps/plot)) == 0:
+                Ci = np.vstack((Ci,C))       
+            if j == t_steps:
+                Ci = np.vstack((Ci,C))
         
-        if plot != 0:
-            fig4,ax4=plt.subplots(figsize=(6,8))
-            ax4.plot(r*1e6,Ci)
-            ax4.plot(r*1e6,C)
-            ax4.set_xlabel('Radius ($\u03BCm$)')
-            ax4.set_ylabel('Concentraiton ($\u03BCg.g^{-1}$)')
+        if plot != None:
+            fig2,ax2 = plt.subplots(figsize=(6,6))
+            for i in range(Ci.shape[0]):
+                ax2.plot(1e6*X,Ci[i,:],label=str(str(int(i*dt*int(t_steps/plot)))+' secs'))
             
-        C = np.vstack([Ci,C])
+            ax2.set_ylabel('Concentraiton ($\u03BCg.g^{-1}$)')
+            ax2.set_xlabel('Radius ($\u03BCm$)')
+            ax2.set_title(str(f'{self.element} for '+str(int(self.t_max/(60)))+' minutes'))
+            
+            if plotDetectionLimit == True:
+                ax2.axhline(SIMS_detectionLimit[str(ele+'[ppm]')][0],c='k')
+                
+            if self.legend == True:
+                ax2.legend()
+            
+            fig2.savefig(str(str(self.element)+'R_steps_'+str(self.R_steps)+'t_steps_'+str(self.t_steps)+'.png'))
+            return Ci,factor,fig2,ax2
         
-        for i in tqdm(range(1,t_steps)):
-            C = np.vstack([C,CoupledModel.f1L(r=r,C=C[-1,:],dt=dt,factor=factor,Darray=DMatrix[i,:])])
-        
-        if plot != 0:
-            for i in range(0,t_steps,int(t_steps/plot)):
-                ax4.plot(r*1e6,C[i,:],label=str(dt*i))
-            ax4.plot(r*1e6,C[-1,:],label=str(t_max))
-            ax4.axvline((r[-1]+r[-2])*1e6/2,label='Boundary')
-            ax4.legend()
-            ax4.set_ylim((self.Cout-5,self.C0+5))
-        return r,C,TempProfiles,DMatrix,t_steps,t_max
+        return Ci,factor
+    
+    
+CM = CoupledModel(x1=0.0001,x2=500*pi,Bi=1,
+              R_steps=15,R=500e-6,
+              C0=200,Cout=10,
+              Ti=2500,Tout=1000,
+              alpha=0.3e-6,element='Cl',
+              t_steps='Auto',t_max=1*1e3,
+              plot=10,legend=True,plotDetectionLimit=True,
+              sphericFactor=True)
+
+CM.runModel()
+    
+
+#%%  Look at the MELTS files 
 
 
-#%%
+# MELTS = pd.read_table(r"C:/Users/r11403eb/OneDrive - The University of Manchester\MELTS\windows_alphamelts_1-9\EC\Phase_mass_tbl.txt",header=2,sep=' ')
+
+# #MELTS.plot(['olivine_0','spinel_0'])
+
+
+# fig_crystal, [ax_crystal,ax_melt] = plt.subplots(2,1,figsize=(6,10))
+
+# ax_crystal.plot(MELTS.iloc[:,4:9],MELTS['Temperature'],label=MELTS.columns[4:9])
+# ax_crystal.set_xlim((-5,100))
+
+# ax_melt.plot(MELTS['liquid_0'],MELTS['Temperature'],label=MELTS.columns[3])
+
+# fit = np.polyfit(MELTS['Temperature'][48:],MELTS['liquid_0'][48:],deg=3)
+
+# ax_melt.plot((fit[3]+fit[2]*MELTS['Temperature']+fit[1]*MELTS['Temperature']**2+fit[0]*MELTS['Temperature']**3),MELTS['Temperature'])
+# ax_melt.set_xlim((-5,100))
+
+# ax_crystal.legend()
+# ax_melt.legend()
 
 
 
-# Ts = np.linspace(800,1600)
-# #ele = ['F','Cl','Br']
-
-# fig,ax = plt.subplots()
 
 
-# ax.plot(Ts,ax.plot(Ts,DiffLaws.arrheniusD(dataD0.loc['F']['D0'],dataD0.loc['F']['Ea'],Ts+273.15),label='Br'))
-# ax.plot(Ts,ax.plot(Ts,DiffLaws.arrheniusD(dataD0.loc['Cl']['D0'],dataD0.loc['Cl']['Ea'],Ts+273.15),label='Br'))
-# ax.plot(Ts,ax.plot(Ts,DiffLaws.arrheniusD(dataD0.loc['Br']['D0'],dataD0.loc['Br']['Ea'],Ts+273.15),label='Br'))
+# %%
