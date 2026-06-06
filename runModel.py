@@ -72,8 +72,10 @@ ax.set_xlabel('Radius ($\\mu$m)')
 ax.set_ylabel('Relative Concentration')
 
 fig, ax = plt.subplots(figsize=(5,4), layout='constrained')
-ax.plot(np.linspace(0,tmax,11),(Brdata[1:,0]/starting_comp['Br'])/(Cldata[1:,0]/starting_comp['Cl']), label = "Br/Cl")
-ax.plot(np.linspace(0,tmax,11),(Fdata[1:,0]/starting_comp['F'])/(Cldata[1:,0]/starting_comp['Cl']), label = "F/Cl")
+ax.plot(np.linspace(0,tmax,11),(Brdata[1:,0]/starting_comp['Br'])/(Cldata[1:,0]/starting_comp['Cl']), label = "Br/Cl (r=0 um)")
+
+ax.plot(np.linspace(0,tmax,11),(Fdata[1:,0]/starting_comp['F'])/(Cldata[1:,0]/starting_comp['Cl']), label = "F/Cl (r=0 um)")
+
 ax.legend()
 ax.axhline(y=1, color='k', linestyle='--')
 ax.set_xticks(np.linspace(0,tmax,6))
